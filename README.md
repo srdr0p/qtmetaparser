@@ -9,3 +9,7 @@ qt metaobject looks like:
 
 
 after running the script:
+
+
+## TODO
+Everything except stringdata, method :)
