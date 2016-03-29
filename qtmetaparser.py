@@ -202,7 +202,7 @@ class QMetaMethod:
         self.offset = off
         struct_map(self, self.c_struct, off)
         struct_maker(self, off)
-        MakeComm(off, str_data[self.name].string + self.get_type_str())
+        MakeComm(off, str_data[self.name].string + " " + self.get_type_str())
 
 
 def get_bytes_size(data_flag):
