@@ -1,3 +1,4 @@
+
 from idc import *
 from idaapi import offflag
 
@@ -80,8 +81,16 @@ QMetaMethod QMetaObject::method(int index) const
         self.offset = offset
         struct_map(self, self.c_struct, offset)
         struct_maker(self, offset)
-        MakeComm(offset, "CLASS: %s" % str_data[self.className].string)
-
+        cmmt = """CLASS: %s
+MethodCount: %d PropertyCount: %d EnumCount: %d
+ConstructorCount: %d SignalCount: %d""" % (str_data[self.className].string,
+    self.methodCount, self.propertyCount, self.enumeratorCount,
+    self.constructorCount, self.signalCount)
+        # print(cmmt)
+        # S = 'ExtLinB(%d, 0, "%s")' % (offset, cmmt)
+        # print(S)
+        # idaapi.run_statements(S)
+        MakeComm(offset, cmmt)
 
 def displayMetaData(data_addr):
     parser = QtMetaParser(data_addr)
