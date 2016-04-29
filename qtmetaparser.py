@@ -3,6 +3,12 @@ from idc import *
 from idaapi import offflag
 
 
+if __EA64__:
+    ARCH_F = FF_QWRD | FF_DATA
+else:
+    ARCH_F = FF_DWRD | FF_DATA
+
+
 def struct_adder(cls, mapper):
     if GetStrucIdByName(cls.__name__) == BADADDR:
         idx = GetLastStrucIdx() + 1
@@ -119,7 +125,7 @@ class QtMetaParser:
         str_data = []
         while Dword(start) == 0xFFFFFFFF and Dword(start + 8) == 0:
             str_data.append(QArrayData(start))
-            start += 16
+            start += QArrayData.size
         return str_data
 
     def make_qmetaobjecprivate(self):
@@ -221,11 +227,13 @@ def get_bytes_size(data_flag):
         bytes_len = 2
     elif isDwrd(data_flag):
         bytes_len = 4
+    elif isQwrd(data_flag):
+        bytes_len = 8
     return bytes_len
 
-
+type_maker = {1: Byte, 2: Word, 4: Dword, 8: Qword}
 def struct_map(obj, stru, off):
-    type_maker = {1: Byte, 2: Word, 4: Dword}
+
     for member in stru:
         bytes_len = get_bytes_size(member[1])
         setattr(obj, member[0], type_maker[bytes_len](off))
@@ -247,12 +255,12 @@ struct QMetaObject::d { // private data
     void *extradata; //reserved for future use
 } d;
 """
-    c_struct = [("superdata", offflag() | FF_DATA | FF_DWRD),
-                ("stringdata", offflag() | FF_DATA | FF_DWRD),
-                ("data", offflag() | FF_DATA | FF_DWRD),
-                ("metacall", offflag() | FF_DATA | FF_DWRD),
-                ("relatedMetaObjects", offflag() | FF_DATA | FF_DWRD),
-                ("extradata", offflag() | FF_DATA | FF_DWRD)]
+    c_struct = [("superdata", offflag() | FF_DATA | ARCH_F),
+                ("stringdata", offflag() | FF_DATA | ARCH_F),
+                ("data", offflag() | FF_DATA | ARCH_F),
+                ("metacall", offflag() | FF_DATA | ARCH_F),
+                ("relatedMetaObjects", offflag() | FF_DATA | ARCH_F),
+                ("extradata", offflag() | FF_DATA | ARCH_F)]
 
     def __init__(self, offset):
         struct_map(self, self.c_struct, offset)
@@ -282,31 +290,32 @@ static inline const QByteArray stringData(const QMetaObject *mo, int index)
 }
 
 """
+    if __EA64__:
+        size = 24
+    else:
+        size = 16
 
-    def __init__(self, ptr):
-        self.ptr = ptr
-        self.ref = Dword(ptr)
-        MakeComm(ptr, "ref")
-        MakeDword(ptr)
-        ptr += 4
-        self.size = Dword(ptr)
-        MakeComm(ptr, "size")
-        MakeDword(ptr)
-        ptr += 4
-        alloc_size = Dword(ptr)
-        self.alloc = 0x7FFFFFFF & alloc_size
-        self.capacityReserved = alloc_size >> 31
-        MakeComm(ptr, "alloc: %d, capRvrsd %d" % (self.alloc, self.capacityReserved))
-        MakeDword(ptr)
-        ptr += 4
-        self.offset = Dword(ptr)
-        self.string = GetString(self.ptr + self.offset)
-        MakeStr(self.ptr + self.offset, BADADDR)
-        MakeComm(ptr, "String: %s" % self.string)
-        MakeDword(ptr)
+    c_struct = [("ref", FF_DATA | FF_DWRD),
+            ("size", FF_DATA | ARCH_F),
+            ("alloc__capRved", FF_DATA | FF_DWRD),
+            ("offset", FF_DATA | ARCH_F) ]
+
+
+    def __init__(self, beg_off):
+        struct_map(self, self.c_struct, beg_off)
+        struct_maker(self, beg_off)
+        self.string = GetString(beg_off + self.offset)
+
+        alloc = 0x7FFFFFFF & self.alloc__capRved
+        capacityReserved = self.alloc__capRved >> 31
+
+        cmmt = "String: %s, alloc: %d, capRvrsd %d" % (self.string, capacityReserved, alloc)
+        MakeComm(beg_off, cmmt)
+
 
     def __repr__(self):
         return "%s" % self.string
+
 
 
 addrtoparse = ScreenEA()
