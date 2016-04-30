@@ -17,7 +17,8 @@ def struct_adder(cls, mapper):
         for member in mapper:
             type_flag = member[1]
             if isOff0(type_flag):
-                AddStrucMember(sid, member[0], -1, type_flag, 0, get_bytes_size(type_flag))
+                reftype = REF_OFF64 if isQwrd(ARCH_F) else REF_OFF32
+                AddStrucMember(sid, member[0], -1, type_flag, 0, get_bytes_size(type_flag), reftype=reftype)
             else:
                 AddStrucMember(sid, member[0], -1, type_flag, -1, get_bytes_size(type_flag))
     else:
