@@ -134,7 +134,7 @@ class QtMetaParser:
         start = self.qmeta_obj_pri.offset + (self.qmeta_obj_pri.methodData << 2)
         method_data = []
         for off in range(start, start + 4 * 5 * self.qmeta_obj_pri.methodCount, 4 * 5):
-            qmthd = QMetaMethod(off, self.str_data)
+            qmthd = QMetaMethod(off, self.d.data, self.str_data)
             # MakeComm(qmthd.offset, "METHOD_%d " % len(method_data) + Comment(qmthd.offset))
             method_data.append(qmthd)
 
@@ -149,55 +149,38 @@ class QMetaMethod:
                 ("typesDataIndex", FF_DATA | FF_DWRD),
                 ("tag", FF_DATA | FF_DWRD),
                 ("flag", FF_DATA | FF_DWRD)]
-    QMetaMethodOff = {"name": 0, "parameterCount": 4, "typesDataIndex": 8, "tag": 12, "flag": 16}
     PropertyFlags = Enum(
-        Invalid=0x00000000,
-        Readable=0x00000001,
-        Writable=0x00000002,
-        Resettable=0x00000004,
-        EnumOrFlag=0x00000008,
-        StdCppSet=0x00000100,
-        Override=0x00000200,
-        Constant=0x00000400,
-        Final=0x00000800,
-        Designable=0x00001000,
-        ResolveDesignable=0x00002000,
-        Scriptable=0x00004000,
-        ResolveScriptable=0x00008000,
-        Stored=0x00010000,
-        ResolveStored=0x00020000,
-        Editable=0x00040000,
-        ResolveEditable=0x00080000,
-        User=0x00100000,
-        ResolveUser=0x00200000,
-        Notify=0x00400000,
+        Invalid=0x00000000, Readable=0x00000001, Writable=0x00000002, Resettable=0x00000004,
+        EnumOrFlag=0x00000008, StdCppSet=0x00000100, Override=0x00000200, Constant=0x00000400,
+        Final=0x00000800, Designable=0x00001000, ResolveDesignable=0x00002000, Scriptable=0x00004000,
+        ResolveScriptable=0x00008000, Stored=0x00010000, ResolveStored=0x00020000, Editable=0x00040000,
+        ResolveEditable=0x00080000, User=0x00100000, ResolveUser=0x00200000, Notify=0x00400000,
         Revisioned=0x00800000
     )
     MethodFlags = Enum(
-        AccessPrivate=0x00,
-        AccessProtected=0x01,
-        AccessPublic=0x02,
-        AccessMask=0x03,
-
-        MethodMethod=0x00,
-        MethodSignal=0x04,
-        MethodSlot=0x08,
-        MethodConstructor=0x0c,
-        MethodTypeMask=0x0c,
-
-        MethodCompatibility=0x10,
-        MethodCloned=0x20,
-        MethodScriptable=0x40,
-        MethodRevisioned=0x80
+        AccessPrivate=0x00, AccessProtected=0x01, AccessPublic=0x02, AccessMask=0x03,
+        MethodMethod=0x00, MethodSignal=0x04, MethodSlot=0x08, MethodConstructor=0x0c, MethodTypeMask=0x0c,
+        MethodCompatibility=0x10, MethodCloned=0x20, MethodScriptable=0x40, MethodRevisioned=0x80
     )
-    MethodTypesDict = {0x00: "METHOD",
-                       0x04: "SIGNAL",
-                       0x08: "SLOT",
-                       0x0c: "CONSTRUCTOR",
-                       }
-    MethodAccessDict = {0x00: "Private",
-                        0x01: "Protected",
-                        0x02: "Public"}
+    MethodTypesDict = {0x00: "METHOD", 0x04: "SIGNAL", 0x08: "SLOT", 0x0c: "CONSTRUCTOR"}
+    MethodAccessDict = {0x00: "Private", 0x01: "Protected", 0x02: "Public"}
+
+    QMetaType_map = {
+        0: "UnknownType", 1: "Bool", 2: "Int", 3: "UInt", 4: "LongLong", 5: "ULongLong", 6: "Double",
+        7: "QChar", 8: "QVariantMap", 9: "QVariantList", 10: "QString", 11: "QStringList",
+        12: "QByteArray", 13: "QBitArray", 14: "QDate", 15: "QTime", 16: "QDateTime", 17: "QUrl",
+        18: "QLocale", 19: "QRect", 20: "QRectF", 21: "QSize", 22: "QSizeF", 23: "QLine", 24: "QLineF",
+        25: "QPoint", 26: "QPointF", 27: "QRegExp", 28: "QVariantHash", 29: "QEasingCurve", 30: "QUuid",
+        31: "VoidStar", 32: "Long", 33: "Short", 34: "Char", 35: "ULong", 36: "UShort", 37: "UChar",
+        38: "Float", 39: "QObjectStar", 40: "SChar", 41: "QVariant", 42: "QModelIndex", 43: "Void",
+        44: "QRegularExpression", 45: "QJsonValue", 46: "QJsonObject", 47: "QJsonArray", 
+        48: "QJsonDocument", 49: "QByteArrayList", 64: "QFont", 65: "QPixmap", 66: "QBrush", 
+        67: "QColor", 68: "QPalette", 69: "QIcon", 70: "QImage", 71: "QPolygon", 72: "QRegion",
+        73: "QBitmap", 74: "QCursor", 75: "QKeySequence", 76: "QPen", 77: "QTextLength",
+        78: "QTextFormat", 79: "QMatrix", 80: "QTransform", 81: "QMatrix4x4", 82: "QVector2D",
+        83: "QVector3D", 84: "QVector4D", 85: "QQuaternion", 86: "QPolygonF", 121: "QSizePolicy",
+        1024: "User"
+    }
 
     def get_type_str(self):
         method_type = self.flag & self.MethodFlags.MethodTypeMask
@@ -214,11 +197,39 @@ class QMetaMethod:
             cmmt += " Revisioned"
         return cmmt
 
-    def __init__(self, off, str_data):
+    def get_type(self, type_off, str_data_off):
+        MakeUnknown(type_off, 4, DOUNK_EXPAND)
+        type_info = Dword(type_off)
+        if type_info in QMetaMethod.QMetaType_map:
+            t = self.QMetaType_map[type_info]
+        elif type_info & 0x80000000:
+            type_info &= 0x7FFFFFFF
+            t = str_data_off[type_info].string
+        MakeComm(type_off, t)
+        MakeDword(type_off)
+        return t
+
+    def __init__(self, off, data_off, str_data_off):
         self.offset = off
         struct_map(self, self.c_struct, off)
         struct_maker(self, off)
-        MakeComm(off, str_data[self.name].string + " " + self.get_type_str())
+
+        ret_type_off = data_off + self.typesDataIndex * 4
+        ret_type_str = self.get_type(ret_type_off, str_data_off)
+        paras_type_off = ret_type_off + 4
+        para_type_strs = []
+        for i in range(self.parameterCount):
+            para_type_off = paras_type_off + i * 8
+            para_type = self.get_type(para_type_off, str_data_off)
+            para_name_off = para_type_off + 4
+            MakeUnknown(para_name_off, 4, DOUNK_EXPAND)
+            MakeDword(para_name_off)
+            para_name = str_data_off[Dword(para_name_off)].string
+            MakeComm(para_name_off, para_name)
+            para_type_strs.append("%s %s" % (para_type, para_name))
+
+        MakeComm(off, "%s %s %s(%s)" % (self.get_type_str(), ret_type_str,
+            str_data_off[self.name].string, ", ".join(para_type_strs)))
 
 
 def get_bytes_size(data_flag):
@@ -233,14 +244,11 @@ def get_bytes_size(data_flag):
     return bytes_len
 
 type_maker = {1: Byte, 2: Word, 4: Dword, 8: Qword}
-def struct_map(obj, stru, off):
 
+def struct_map(obj, stru, off):
     for member in stru:
         bytes_len = get_bytes_size(member[1])
         setattr(obj, member[0], type_maker[bytes_len](off))
-        # MakeUnknown(off, bytes_len, DOUNK_EXPAND)
-        # type_maker[mem_len](off)
-        # MakeComm(off, member[0])
         off += bytes_len
     return off
 
