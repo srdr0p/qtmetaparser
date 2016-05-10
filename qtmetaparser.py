@@ -219,17 +219,23 @@ class QMetaMethod:
         paras_type_off = ret_type_off + 4
         para_type_strs = []
         for i in range(self.parameterCount):
-            para_type_off = paras_type_off + i * 8
+            para_type_off = paras_type_off + i * 4
             para_type = self.get_type(para_type_off, str_data_off)
-            para_name_off = para_type_off + 4
+            para_type_strs.append(para_type)
+
+        para_name_strs = []
+        paras_name_off = paras_type_off + self.parameterCount * 4
+        for i in range(self.parameterCount):
+            para_name_off = paras_name_off + i * 4
             MakeUnknown(para_name_off, 4, DOUNK_EXPAND)
             MakeDword(para_name_off)
             para_name = str_data_off[Dword(para_name_off)].string
             MakeComm(para_name_off, para_name)
-            para_type_strs.append("%s %s" % (para_type, para_name))
+            para_name_strs.append(para_name)
 
+        paras_strs = map(lambda x, y: "%s %s" % (x, y), para_type_strs, para_name_strs)
         MakeComm(off, "%s %s %s(%s)" % (self.get_type_str(), ret_type_str,
-            str_data_off[self.name].string, ", ".join(para_type_strs)))
+            str_data_off[self.name].string, ", ".join(paras_strs)))
 
 
 def get_bytes_size(data_flag):
